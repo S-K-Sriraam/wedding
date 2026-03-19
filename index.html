@@ -505,8 +505,8 @@
 
                     <form id="rsvpForm" class="space-y-6">
                         <div>
-                            <label class="block text-gold-400 text-sm uppercase tracking-wider mb-2">Full Name</label>
-                            <input type="text"
+                            <label for="fullName" class="block text-gold-400 text-sm uppercase tracking-wider mb-2">Full Name</label>
+                            <input id="fullName" name="full_name" type="text"
                                 class="w-full bg-royal-900 border-b border-gold-500 text-cream px-4 py-3 focus:outline-none focus:border-gold-300 transition-colors"
                                 placeholder="Enter your name" required>
                         </div>
@@ -527,13 +527,13 @@
                             <label class="block text-gold-400 text-sm uppercase tracking-wider mb-2">Attending?</label>
                             <div class="flex gap-4 mt-2">
                                 <label class="flex items-center cursor-pointer">
-                                    <input type="radio" name="attendance"
+                                    <input type="radio" name="attendance" value="Joyfully Accepts"
                                         class="form-radio text-gold-500 focus:ring-gold-500 bg-royal-900 border-gold-500"
                                         checked>
                                     <span class="ml-2 text-cream">Joyfully Accepts</span>
                                 </label>
                                 <label class="flex items-center cursor-pointer">
-                                    <input type="radio" name="attendance"
+                                    <input type="radio" name="attendance" value="Regretfully Declines"
                                         class="form-radio text-gold-500 focus:ring-gold-500 bg-royal-900 border-gold-500">
                                     <span class="ml-2 text-cream">Regretfully Declines</span>
                                 </label>
@@ -552,6 +552,11 @@
                         <h3 class="font-serif text-3xl text-cream mb-2">Thank You!</h3>
                         <p class="text-gold-200">Your response has been recorded.</p>
                         <p class="text-sm text-gray-400 mt-4">We look forward to seeing you.</p>
+                    </div>
+
+                    <div id="rsvpEntries" class="hidden mt-8 border border-gold-500/30 rounded-lg p-4 bg-royal-900/40">
+                        <h4 class="font-serif text-2xl text-gold-300 mb-3">Submitted RSVP Data</h4>
+                        <div id="rsvpEntriesList" class="space-y-2 text-left"></div>
                     </div>
                 </div>
             </div>
@@ -813,10 +818,74 @@
             });
         });
 
+        const RSVP_STORAGE_KEY = 'wedding_rsvp_entries';
+
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function getRsvpEntries() {
+            try {
+                const raw = localStorage.getItem(RSVP_STORAGE_KEY);
+                const parsed = raw ? JSON.parse(raw) : [];
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (error) {
+                return [];
+            }
+        }
+
+        function saveRsvpEntries(entries) {
+            localStorage.setItem(RSVP_STORAGE_KEY, JSON.stringify(entries));
+        }
+
+        function renderRsvpEntries() {
+            const entriesContainer = document.getElementById('rsvpEntries');
+            const entriesList = document.getElementById('rsvpEntriesList');
+            if (!entriesContainer || !entriesList) return;
+
+            const entries = getRsvpEntries();
+            if (!entries.length) {
+                entriesContainer.classList.add('hidden');
+                entriesList.innerHTML = '';
+                return;
+            }
+
+            entriesContainer.classList.remove('hidden');
+            entriesList.innerHTML = entries.map((entry, index) => `
+                <div class="rounded border border-gold-500/20 p-3 bg-royal-800/70">
+                    <p class="text-cream"><span class="text-gold-300">#${index + 1}</span> ${escapeHtml(entry.fullName)}</p>
+                    <p class="text-gold-200 text-sm">Guests: ${escapeHtml(entry.guestCount)} | ${escapeHtml(entry.attendance)}</p>
+                    <p class="text-gray-400 text-xs mt-1">${escapeHtml(entry.submittedAt)}</p>
+                </div>
+            `).join('');
+        }
+
         const form = document.getElementById('rsvpForm');
         if (form) {
+            renderRsvpEntries();
+
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
+
+                const formData = new FormData(form);
+                const entry = {
+                    fullName: (formData.get('full_name') || '').toString().trim(),
+                    guestCount: (formData.get('guest_count') || '').toString(),
+                    attendance: (formData.get('attendance') || '').toString(),
+                    submittedAt: new Date().toLocaleString('en-IN')
+                };
+
+                if (!entry.fullName) return;
+
+                const entries = getRsvpEntries();
+                entries.unshift(entry);
+                saveRsvpEntries(entries);
+
                 gsap.to(form, {
                     opacity: 0,
                     y: -20,
@@ -831,6 +900,7 @@
                                 { scale: 1, rotation: 0, duration: 0.8, ease: "elastic.out(1, 0.5)" }
                             );
                         }
+                        renderRsvpEntries();
                     }
                 });
             });
